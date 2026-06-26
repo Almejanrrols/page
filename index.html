@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Hub de Accesos Directos</title>
+    <style>
+        /* CSS: Estilos base y tipografía tipo Windows */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e1e; /* Fondo oscuro */
+            color: #ffffff;
+            margin: 0;
+            padding: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        /* La cuadrícula tipo Windows 8 */
+        .hub-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        /* Estilo de cada "Tile" (cuadrado) */
+        .tile {
+            background-color: #0078D7; /* Azul clásico de Windows */
+            text-decoration: none;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 1 / 1; /* Mantiene el cuadrado perfecto */
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            /* Transición suave para la animación */
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.2s ease;
+        }
+
+        /* Animación al pasar el cursor */
+        .tile:hover {
+            transform: scale(1.1); /* Agranda el cuadrado */
+            background-color: #005A9E; /* Oscurece un poco el azul */
+            z-index: 10;
+        }
+
+        /* Estilo del icono */
+        .tile img {
+            width: 48px;
+            height: 48px;
+            object-fit: contain;
+            margin-bottom: 15px;
+        }
+
+        /* Estilo del texto */
+        .tile span {
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+
+        /* Mensaje de carga o error */
+        #mensaje {
+            grid-column: 1 / -1;
+            text-align: center;
+            font-size: 1.2rem;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="hub-grid" id="hub">
+        <div id="mensaje">Cargando accesos directos...</div>
+    </div>
+
+    <script>
+        // JS: Lógica para leer el archivo .ini y crear los cuadrados
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('pages.ini')
+                .then(response => {
+                    if (!response.ok) throw new Error('No se pudo cargar el archivo');
+                    return response.text();
+                })
+                .then(text => {
+                    const pages = parseCustomINI(text);
+                    renderHub(pages);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('mensaje').innerText = 
+                        'Error al cargar pages.ini. (Recuerda que debes abrir esto desde un servidor local, no solo haciendo doble clic).';
+                });
+        });
+
+        // Función para parsear tu formato específico de .ini
+        function parseCustomINI(text) {
+            const lines = text.split('\n');
+            const pages = [];
+            let currentPage = {};
+
+            lines.forEach(line => {
+                line = line.trim();
+                
+                // Si la línea está vacía, guardamos el bloque actual y empezamos uno nuevo
+                if (line === '') {
+                    if (Object.keys(currentPage).length > 0) {
+                        pages.push(currentPage);
+                        currentPage = {};
+                    }
+                    return;
+                }
+
+                // Buscamos los dos puntos para separar la clave del valor
+                const separatorIndex = line.indexOf(':');
+                if (separatorIndex !== -1) {
+                    const key = line.substring(0, separatorIndex).trim();
+                    const value = line.substring(separatorIndex + 1).trim();
+                    currentPage[key] = value;
+                }
+            });
+
+            // Guardar el último bloque si el archivo no termina en una línea vacía
+            if (Object.keys(currentPage).length > 0) {
+                pages.push(currentPage);
+            }
+
+            return pages;
+        }
+
+        // Función para dibujar los accesos directos en el HTML
+        function renderHub(pages) {
+            const hub = document.getElementById('hub');
+            hub.innerHTML = ''; // Limpiar el mensaje de carga
+
+            pages.forEach(page => {
+                // Crear el enlace (Tile)
+                const a = document.createElement('a');
+                a.className = 'tile';
+                a.target = '_blank'; // Para que abra en una pestaña nueva
+                
+                // Asegurarnos de que la URL tenga https:// si no lo tiene
+                let url = page.url || '#';
+                if (url !== '#' && !url.startsWith('http://') && !url.startsWith('https://')) {
+                    url = 'https://' + url;
+                }
+                a.href = url;
+
+                // Crear el icono
+                const img = document.createElement('img');
+                img.src = page.icon || '';
+                img.alt = page.name || 'Icono';
+                // Si la imagen falla (ej. ruta incorrecta), la ocultamos
+                img.onerror = () => { img.style.display = 'none'; };
+
+                // Crear el texto
+                const span = document.createElement('span');
+                span.textContent = page.name || 'Sin Nombre';
+
+                // Añadir elementos al Tile, y el Tile al Hub
+                a.appendChild(img);
+                a.appendChild(span);
+                hub.appendChild(a);
+            });
+        }
+    </script>
+</body>
+</html>
