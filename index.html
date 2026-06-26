@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi Hub de Accesos Directos</title>
     <style>
-        /* CSS: Estilos base y tipografía tipo Windows */
+        /* CSS: Estilos base */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1e1e1e; /* Fondo oscuro */
+            background-color: #1e1e1e;
             color: #ffffff;
             margin: 0;
             padding: 50px;
@@ -17,41 +17,44 @@
             align-items: flex-start;
             min-height: 100vh;
             box-sizing: border-box;
+            /* Permite scroll horizontal si la cuadrícula crece mucho */
+            overflow-x: auto; 
         }
 
-        /* La cuadrícula tipo Windows 8 */
+        /* La cuadrícula tipo Windows 8 con tamaño fijo para mantener el formato */
         .hub-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            /* Columnas y filas fijas de 140px. El grid crecerá según las coordenadas */
+            grid-auto-columns: 140px;
+            grid-auto-rows: 140px;
             gap: 15px;
-            width: 100%;
-            max-width: 900px;
+            /* Si un elemento no tiene 'order:', rellenará los huecos automáticamente */
+            grid-auto-flow: row dense; 
         }
 
         /* Estilo de cada "Tile" (cuadrado) */
         .tile {
-            background-color: #0078D7; /* Azul clásico de Windows */
+            background-color: #0078D7;
             text-decoration: none;
             color: white;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            aspect-ratio: 1 / 1; /* Mantiene el cuadrado perfecto */
             padding: 15px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            /* Transición suave para la animación */
             transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.2s ease;
+            box-sizing: border-box;
+            width: 100%;
+            height: 100%;
         }
 
-        /* Animación al pasar el cursor */
         .tile:hover {
-            transform: scale(1.1); /* Agranda el cuadrado */
-            background-color: #005A9E; /* Oscurece un poco el azul */
+            transform: scale(1.1);
+            background-color: #005A9E;
             z-index: 10;
         }
 
-        /* Estilo del icono */
         .tile img {
             width: 48px;
             height: 48px;
@@ -59,7 +62,6 @@
             margin-bottom: 15px;
         }
 
-        /* Estilo del texto */
         .tile span {
             font-size: 14px;
             font-weight: 600;
@@ -67,7 +69,6 @@
             letter-spacing: 0.5px;
         }
 
-        /* Mensaje de carga o error */
         #mensaje {
             grid-column: 1 / -1;
             text-align: center;
@@ -83,26 +84,35 @@
     </div>
 
     <script>
-        // JS: Lógica para leer el archivo .ini y crear los cuadrados
         document.addEventListener('DOMContentLoaded', () => {
-            fetch('pages.ini')
-                .then(response => {
-                    if (!response.ok) throw new Error('No se pudo cargar el archivo');
-                    return response.text();
-                })
-                .then(text => {
-                    const pages = parseCustomINI(text);
-                    renderHub(pages);
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('mensaje').innerText = 
-                        'Error al cargar pages.ini. (Recuerda que debes abrir esto desde un servidor local, no solo haciendo doble clic).';
-                });
+            // Promise.allSettled nos permite intentar cargar ambos archivos sin que uno bloquee al otro si falta
+            Promise.allSettled([
+                fetch('pages.ini').then(res => res.ok ? res.text() : Promise.reject('No pages.ini')),
+                fetch('pages_64.ini').then(res => res.ok ? res.text() : Promise.reject('No pages_64.ini'))
+            ]).then(results => {
+                let todasLasPaginas = [];
+
+                // Procesamos pages.ini (Normal)
+                if (results[0].status === 'fulfilled') {
+                    todasLasPaginas = todasLasPaginas.concat(parseCustomINI(results[0].value, false));
+                }
+
+                // Procesamos pages_64.ini (Base64)
+                if (results[1].status === 'fulfilled') {
+                    todasLasPaginas = todasLasPaginas.concat(parseCustomINI(results[1].value, true));
+                }
+
+                if (todasLasPaginas.length === 0) {
+                    document.getElementById('mensaje').innerText = 'No se encontraron accesos directos o no hay servidor local activo.';
+                    return;
+                }
+
+                renderHub(todasLasPaginas);
+            });
         });
 
-        // Función para parsear tu formato específico de .ini
-        function parseCustomINI(text) {
+        // Función para parsear el .ini, con soporte para Base64
+        function parseCustomINI(text, isBase64) {
             const lines = text.split('\n');
             const pages = [];
             let currentPage = {};
@@ -110,7 +120,6 @@
             lines.forEach(line => {
                 line = line.trim();
                 
-                // Si la línea está vacía, guardamos el bloque actual y empezamos uno nuevo
                 if (line === '') {
                     if (Object.keys(currentPage).length > 0) {
                         pages.push(currentPage);
@@ -119,16 +128,24 @@
                     return;
                 }
 
-                // Buscamos los dos puntos para separar la clave del valor
                 const separatorIndex = line.indexOf(':');
                 if (separatorIndex !== -1) {
-                    const key = line.substring(0, separatorIndex).trim();
-                    const value = line.substring(separatorIndex + 1).trim();
+                    const key = line.substring(0, separatorIndex).trim().toLowerCase();
+                    let value = line.substring(separatorIndex + 1).trim();
+
+                    // Si es el archivo 64 y la clave es URL, la decodificamos
+                    if (isBase64 && key === 'url') {
+                        try {
+                            value = atob(value); // atob decodifica Base64 a texto normal
+                        } catch (e) {
+                            console.error('Error decodificando Base64:', value);
+                            value = '#';
+                        }
+                    }
                     currentPage[key] = value;
                 }
             });
 
-            // Guardar el último bloque si el archivo no termina en una línea vacía
             if (Object.keys(currentPage).length > 0) {
                 pages.push(currentPage);
             }
@@ -136,36 +153,59 @@
             return pages;
         }
 
-        // Función para dibujar los accesos directos en el HTML
+        // Traduce coordenadas como "1a" o "a1" a fila y columna numérica
+        function parseGridOrder(orderStr) {
+            if (!orderStr) return null;
+            
+            orderStr = orderStr.trim().toLowerCase();
+            // Busca (letras)(numeros) o (numeros)(letras)
+            const match = orderStr.match(/^([a-z]+)(\d+)$|^(\d+)([a-z]+)$/);
+            if (!match) return null;
+
+            const letters = match[1] || match[4];
+            const numbers = match[2] || match[3];
+
+            // Convierte las letras a un número de columna (a=1, b=2, c=3...)
+            let col = 0;
+            for (let i = 0; i < letters.length; i++) {
+                col = col * 26 + (letters.charCodeAt(i) - 96);
+            }
+            
+            const row = parseInt(numbers, 10);
+            return { row, col };
+        }
+
+        // Dibuja los elementos en el HTML
         function renderHub(pages) {
             const hub = document.getElementById('hub');
-            hub.innerHTML = ''; // Limpiar el mensaje de carga
+            hub.innerHTML = ''; 
 
             pages.forEach(page => {
-                // Crear el enlace (Tile)
                 const a = document.createElement('a');
                 a.className = 'tile';
-                a.target = '_blank'; // Para que abra en una pestaña nueva
+                a.target = '_blank';
                 
-                // Asegurarnos de que la URL tenga https:// si no lo tiene
                 let url = page.url || '#';
                 if (url !== '#' && !url.startsWith('http://') && !url.startsWith('https://')) {
                     url = 'https://' + url;
                 }
                 a.href = url;
 
-                // Crear el icono
+                // Asignar posición en la cuadrícula si existe el parámetro 'order'
+                const gridPos = parseGridOrder(page.order);
+                if (gridPos) {
+                    // grid-area: fila-inicio / col-inicio / fila-fin / col-fin
+                    a.style.gridArea = `${gridPos.row} / ${gridPos.col} / ${gridPos.row + 1} / ${gridPos.col + 1}`;
+                }
+
                 const img = document.createElement('img');
                 img.src = page.icon || '';
                 img.alt = page.name || 'Icono';
-                // Si la imagen falla (ej. ruta incorrecta), la ocultamos
                 img.onerror = () => { img.style.display = 'none'; };
 
-                // Crear el texto
                 const span = document.createElement('span');
                 span.textContent = page.name || 'Sin Nombre';
 
-                // Añadir elementos al Tile, y el Tile al Hub
                 a.appendChild(img);
                 a.appendChild(span);
                 hub.appendChild(a);
