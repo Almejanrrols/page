@@ -17,24 +17,21 @@
             align-items: flex-start;
             min-height: 100vh;
             box-sizing: border-box;
-            /* Permite scroll horizontal si la cuadrícula crece mucho */
             overflow-x: auto; 
         }
 
-        /* La cuadrícula tipo Windows 8 con tamaño fijo para mantener el formato */
+        /* La cuadrícula tipo Windows 8 */
         .hub-grid {
             display: grid;
-            /* Columnas y filas fijas de 140px. El grid crecerá según las coordenadas */
             grid-auto-columns: 140px;
             grid-auto-rows: 140px;
             gap: 15px;
-            /* Si un elemento no tiene 'order:', rellenará los huecos automáticamente */
             grid-auto-flow: row dense; 
         }
 
         /* Estilo de cada "Tile" (cuadrado) */
         .tile {
-            background-color: #0078D7;
+            background-color: #0078D7; /* Color azul por defecto si no le pones color en el .ini */
             text-decoration: none;
             color: white;
             display: flex;
@@ -43,15 +40,17 @@
             justify-content: center;
             padding: 15px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.2s ease;
+            /* Transición ahora aplica al filtro de brillo en lugar del color de fondo */
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.2s ease;
             box-sizing: border-box;
             width: 100%;
             height: 100%;
         }
 
+        /* Al pasar el ratón, se agranda y oscurece el color actual */
         .tile:hover {
             transform: scale(1.1);
-            background-color: #005A9E;
+            filter: brightness(0.85); /* Esto oscurece cualquier color hex que pongas */
             z-index: 10;
         }
 
@@ -85,19 +84,16 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Promise.allSettled nos permite intentar cargar ambos archivos sin que uno bloquee al otro si falta
             Promise.allSettled([
                 fetch('pages.ini').then(res => res.ok ? res.text() : Promise.reject('No pages.ini')),
                 fetch('pages_64.ini').then(res => res.ok ? res.text() : Promise.reject('No pages_64.ini'))
             ]).then(results => {
                 let todasLasPaginas = [];
 
-                // Procesamos pages.ini (Normal)
                 if (results[0].status === 'fulfilled') {
                     todasLasPaginas = todasLasPaginas.concat(parseCustomINI(results[0].value, false));
                 }
 
-                // Procesamos pages_64.ini (Base64)
                 if (results[1].status === 'fulfilled') {
                     todasLasPaginas = todasLasPaginas.concat(parseCustomINI(results[1].value, true));
                 }
@@ -111,7 +107,7 @@
             });
         });
 
-        // Función para parsear el .ini, con soporte para Base64
+        // Función para parsear el .ini
         function parseCustomINI(text, isBase64) {
             const lines = text.split('\n');
             const pages = [];
@@ -133,10 +129,9 @@
                     const key = line.substring(0, separatorIndex).trim().toLowerCase();
                     let value = line.substring(separatorIndex + 1).trim();
 
-                    // Si es el archivo 64 y la clave es URL, la decodificamos
                     if (isBase64 && key === 'url') {
                         try {
-                            value = atob(value); // atob decodifica Base64 a texto normal
+                            value = atob(value);
                         } catch (e) {
                             console.error('Error decodificando Base64:', value);
                             value = '#';
@@ -153,19 +148,17 @@
             return pages;
         }
 
-        // Traduce coordenadas como "1a" o "a1" a fila y columna numérica
+        // Parsear coordenadas (ej. 1a, b2)
         function parseGridOrder(orderStr) {
             if (!orderStr) return null;
             
             orderStr = orderStr.trim().toLowerCase();
-            // Busca (letras)(numeros) o (numeros)(letras)
             const match = orderStr.match(/^([a-z]+)(\d+)$|^(\d+)([a-z]+)$/);
             if (!match) return null;
 
             const letters = match[1] || match[4];
             const numbers = match[2] || match[3];
 
-            // Convierte las letras a un número de columna (a=1, b=2, c=3...)
             let col = 0;
             for (let i = 0; i < letters.length; i++) {
                 col = col * 26 + (letters.charCodeAt(i) - 96);
@@ -175,7 +168,7 @@
             return { row, col };
         }
 
-        // Dibuja los elementos en el HTML
+        // Dibuja los elementos
         function renderHub(pages) {
             const hub = document.getElementById('hub');
             hub.innerHTML = ''; 
@@ -191,10 +184,14 @@
                 }
                 a.href = url;
 
-                // Asignar posición en la cuadrícula si existe el parámetro 'order'
+                // 1. Asignar Color si existe en el .ini
+                if (page.color) {
+                    a.style.backgroundColor = page.color;
+                }
+
+                // 2. Asignar Posición (Coordenadas)
                 const gridPos = parseGridOrder(page.order);
                 if (gridPos) {
-                    // grid-area: fila-inicio / col-inicio / fila-fin / col-fin
                     a.style.gridArea = `${gridPos.row} / ${gridPos.col} / ${gridPos.row + 1} / ${gridPos.col + 1}`;
                 }
 
