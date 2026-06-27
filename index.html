@@ -31,26 +31,25 @@
 
         /* Estilo de cada "Tile" (cuadrado) */
         .tile {
-            background-color: #0078D7; /* Color azul por defecto si no le pones color en el .ini */
+            background-color: #0078D7; /* Color azul predeterminado */
             text-decoration: none;
-            color: white;
+            color: white; /* Color de texto blanco predeterminado */
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             padding: 15px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            /* Transición ahora aplica al filtro de brillo en lugar del color de fondo */
             transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.2s ease;
             box-sizing: border-box;
             width: 100%;
             height: 100%;
         }
 
-        /* Al pasar el ratón, se agranda y oscurece el color actual */
+        /* Al pasar el ratón se agranda y oscurece un poco */
         .tile:hover {
             transform: scale(1.1);
-            filter: brightness(0.85); /* Esto oscurece cualquier color hex que pongas */
+            filter: brightness(0.85);
             z-index: 10;
         }
 
@@ -90,10 +89,12 @@
             ]).then(results => {
                 let todasLasPaginas = [];
 
+                // Cargar páginas normales
                 if (results[0].status === 'fulfilled') {
                     todasLasPaginas = todasLasPaginas.concat(parseCustomINI(results[0].value, false));
                 }
 
+                // Cargar páginas con Base64
                 if (results[1].status === 'fulfilled') {
                     todasLasPaginas = todasLasPaginas.concat(parseCustomINI(results[1].value, true));
                 }
@@ -168,6 +169,41 @@
             return { row, col };
         }
 
+        // Función para procesar y aplicar el text-outline mediante text-shadow
+        function aplicarTextOutline(elemento, outlineStr) {
+            if (!outlineStr) return;
+
+            const parts = outlineStr.trim().split(/\s+/);
+            
+            if (parts[0].toLowerCase() === 'true' && parts.length >= 3) {
+                const color = parts[1]; // ej: #8c03fc
+                const size = parts[2];  // ej: 2px
+
+                elemento.style.textShadow = `
+                    -${size} -${size} 0 ${color},  
+                     0px -${size} 0 ${color},  
+                     ${size} -${size} 0 ${color},  
+                     ${size}  0px 0 ${color},  
+                     ${size}  ${size} 0 ${color},  
+                     0px  ${size} 0 ${color},  
+                    -${size}  ${size} 0 ${color},  
+                    -${size}  0px 0 ${color}
+                `;
+            }
+        }
+
+        // Función para procesar y aplicar el color del texto personalizado
+        function aplicarTextColor(elemento, textColorStr) {
+            if (!textColorStr) return;
+
+            const parts = textColorStr.trim().split(/\s+/);
+
+            if (parts[0].toLowerCase() === 'true' && parts.length >= 2) {
+                const color = parts[1]; // ej: #000000
+                elemento.style.color = color;
+            }
+        }
+
         // Dibuja los elementos
         function renderHub(pages) {
             const hub = document.getElementById('hub');
@@ -184,12 +220,12 @@
                 }
                 a.href = url;
 
-                // 1. Asignar Color si existe en el .ini
-                if (page.color) {
+                // Asignar Color de Fondo (Ignorando explícitamente 'false')
+                if (page.color && page.color.toLowerCase() !== 'false') {
                     a.style.backgroundColor = page.color;
                 }
 
-                // 2. Asignar Posición (Coordenadas)
+                // Asignar Posición
                 const gridPos = parseGridOrder(page.order);
                 if (gridPos) {
                     a.style.gridArea = `${gridPos.row} / ${gridPos.col} / ${gridPos.row + 1} / ${gridPos.col + 1}`;
@@ -202,6 +238,16 @@
 
                 const span = document.createElement('span');
                 span.textContent = page.name || 'Sin Nombre';
+
+                // Aplicar el contorno personalizado si existe
+                if (page['text-outline']) {
+                    aplicarTextOutline(span, page['text-outline']);
+                }
+
+                // Aplicar el color de texto personalizado si existe
+                if (page['text-color']) {
+                    aplicarTextColor(span, page['text-color']);
+                }
 
                 a.appendChild(img);
                 a.appendChild(span);
