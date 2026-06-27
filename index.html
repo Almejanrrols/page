@@ -31,9 +31,9 @@
 
         /* Estilo de cada "Tile" (cuadrado) */
         .tile {
-            background-color: #0078D7; /* Color azul predeterminado */
+            background-color: #0078D7;
             text-decoration: none;
-            color: white; /* Color de texto blanco predeterminado */
+            color: white;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -46,13 +46,13 @@
             height: 100%;
         }
 
-        /* Al pasar el ratón se agranda y oscurece un poco */
         .tile:hover {
             transform: scale(1.1);
             filter: brightness(0.85);
             z-index: 10;
         }
 
+        /* El tamaño por defecto si no se especifica img-size */
         .tile img {
             width: 48px;
             height: 48px;
@@ -89,12 +89,10 @@
             ]).then(results => {
                 let todasLasPaginas = [];
 
-                // Cargar páginas normales
                 if (results[0].status === 'fulfilled') {
                     todasLasPaginas = todasLasPaginas.concat(parseCustomINI(results[0].value, false));
                 }
 
-                // Cargar páginas con Base64
                 if (results[1].status === 'fulfilled') {
                     todasLasPaginas = todasLasPaginas.concat(parseCustomINI(results[1].value, true));
                 }
@@ -169,16 +167,13 @@
             return { row, col };
         }
 
-        // Función para procesar y aplicar el text-outline mediante text-shadow
+        // Función para procesar y aplicar el text-outline
         function aplicarTextOutline(elemento, outlineStr) {
             if (!outlineStr) return;
-
             const parts = outlineStr.trim().split(/\s+/);
-            
             if (parts[0].toLowerCase() === 'true' && parts.length >= 3) {
-                const color = parts[1]; // ej: #8c03fc
-                const size = parts[2];  // ej: 2px
-
+                const color = parts[1];
+                const size = parts[2];
                 elemento.style.textShadow = `
                     -${size} -${size} 0 ${color},  
                      0px -${size} 0 ${color},  
@@ -192,15 +187,32 @@
             }
         }
 
-        // Función para procesar y aplicar el color del texto personalizado
+        // Función para procesar y aplicar el color del texto
         function aplicarTextColor(elemento, textColorStr) {
             if (!textColorStr) return;
-
             const parts = textColorStr.trim().split(/\s+/);
-
             if (parts[0].toLowerCase() === 'true' && parts.length >= 2) {
-                const color = parts[1]; // ej: #000000
-                elemento.style.color = color;
+                elemento.style.color = parts[1];
+            }
+        }
+
+        // Función para aplicar un tamaño personalizado a la imagen
+        function aplicarTamañoImagen(imgElement, sizeStr) {
+            if (!sizeStr) return;
+            
+            // Separamos por la letra "x" (ignorando mayúsculas/minúsculas y espacios)
+            const parts = sizeStr.toLowerCase().split('x');
+            
+            if (parts.length === 2) {
+                let width = parts[0].trim();
+                let height = parts[1].trim();
+                
+                // Si solo pusieron números (ej: 64), le añadimos "px" para que el CSS lo entienda
+                if (/^\d+$/.test(width)) width += 'px';
+                if (/^\d+$/.test(height)) height += 'px';
+
+                imgElement.style.width = width;
+                imgElement.style.height = height;
             }
         }
 
@@ -212,7 +224,7 @@
             pages.forEach(page => {
                 const a = document.createElement('a');
                 a.className = 'tile';
-                a.target = '_blank';
+                // Ya no usamos a.target = '_blank', por lo que cargará en la misma pestaña
                 
                 let url = page.url || '#';
                 if (url !== '#' && !url.startsWith('http://') && !url.startsWith('https://')) {
@@ -231,23 +243,23 @@
                     a.style.gridArea = `${gridPos.row} / ${gridPos.col} / ${gridPos.row + 1} / ${gridPos.col + 1}`;
                 }
 
+                // Configurar la Imagen
                 const img = document.createElement('img');
                 img.src = page.icon || '';
                 img.alt = page.name || 'Icono';
                 img.onerror = () => { img.style.display = 'none'; };
+                
+                // Aplicar tamaño personalizado si existe "img-size"
+                if (page['img-size']) {
+                    aplicarTamañoImagen(img, page['img-size']);
+                }
 
+                // Configurar el Texto
                 const span = document.createElement('span');
                 span.textContent = page.name || 'Sin Nombre';
 
-                // Aplicar el contorno personalizado si existe
-                if (page['text-outline']) {
-                    aplicarTextOutline(span, page['text-outline']);
-                }
-
-                // Aplicar el color de texto personalizado si existe
-                if (page['text-color']) {
-                    aplicarTextColor(span, page['text-color']);
-                }
+                if (page['text-outline']) aplicarTextOutline(span, page['text-outline']);
+                if (page['text-color']) aplicarTextColor(span, page['text-color']);
 
                 a.appendChild(img);
                 a.appendChild(span);
