@@ -31,9 +31,9 @@
 
         /* Estilo de cada "Tile" (cuadrado) */
         .tile {
-            background-color: #0078D7; /* Color azul predeterminado */
+            background-color: #0078D7;
             text-decoration: none;
-            color: white; /* Color de texto blanco predeterminado */
+            color: white;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -44,9 +44,9 @@
             box-sizing: border-box;
             width: 100%;
             height: 100%;
+            position: relative; /* Crucial para que las coordenadas (text-place) no se salgan del cuadrado */
         }
 
-        /* Al pasar el ratón se agranda y oscurece un poco */
         .tile:hover {
             transform: scale(1.1);
             filter: brightness(0.85);
@@ -65,6 +65,7 @@
             font-weight: 600;
             text-align: center;
             letter-spacing: 0.5px;
+            z-index: 2; /* Asegura que el texto siempre quede por encima de la imagen si se cruzan */
         }
 
         #mensaje {
@@ -89,26 +90,17 @@
             ]).then(results => {
                 let todasLasPaginas = [];
 
-                // Cargar páginas normales
-                if (results[0].status === 'fulfilled') {
-                    todasLasPaginas = todasLasPaginas.concat(parseCustomINI(results[0].value, false));
-                }
-
-                // Cargar páginas con Base64
-                if (results[1].status === 'fulfilled') {
-                    todasLasPaginas = todasLasPaginas.concat(parseCustomINI(results[1].value, true));
-                }
+                if (results[0].status === 'fulfilled') todasLasPaginas = todasLasPaginas.concat(parseCustomINI(results[0].value, false));
+                if (results[1].status === 'fulfilled') todasLasPaginas = todasLasPaginas.concat(parseCustomINI(results[1].value, true));
 
                 if (todasLasPaginas.length === 0) {
                     document.getElementById('mensaje').innerText = 'No se encontraron accesos directos o no hay servidor local activo.';
                     return;
                 }
-
                 renderHub(todasLasPaginas);
             });
         });
 
-        // Función para parsear el .ini
         function parseCustomINI(text, isBase64) {
             const lines = text.split('\n');
             const pages = [];
@@ -131,80 +123,96 @@
                     let value = line.substring(separatorIndex + 1).trim();
 
                     if (isBase64 && key === 'url') {
-                        try {
-                            value = atob(value);
-                        } catch (e) {
-                            console.error('Error decodificando Base64:', value);
-                            value = '#';
-                        }
+                        try { value = atob(value); } 
+                        catch (e) { value = '#'; }
                     }
                     currentPage[key] = value;
                 }
             });
 
-            if (Object.keys(currentPage).length > 0) {
-                pages.push(currentPage);
-            }
-
+            if (Object.keys(currentPage).length > 0) pages.push(currentPage);
             return pages;
         }
 
-        // Parsear coordenadas (ej. 1a, b2)
         function parseGridOrder(orderStr) {
             if (!orderStr) return null;
-            
             orderStr = orderStr.trim().toLowerCase();
             const match = orderStr.match(/^([a-z]+)(\d+)$|^(\d+)([a-z]+)$/);
             if (!match) return null;
-
             const letters = match[1] || match[4];
             const numbers = match[2] || match[3];
-
             let col = 0;
             for (let i = 0; i < letters.length; i++) {
                 col = col * 26 + (letters.charCodeAt(i) - 96);
             }
-            
-            const row = parseInt(numbers, 10);
-            return { row, col };
+            return { row: parseInt(numbers, 10), col };
         }
 
-        // Función para procesar y aplicar el text-outline mediante text-shadow
         function aplicarTextOutline(elemento, outlineStr) {
             if (!outlineStr) return;
-
             const parts = outlineStr.trim().split(/\s+/);
-            
             if (parts[0].toLowerCase() === 'true' && parts.length >= 3) {
-                const color = parts[1]; // ej: #8c03fc
-                const size = parts[2];  // ej: 2px
-
+                const color = parts[1];
+                const size = parts[2];
                 elemento.style.textShadow = `
-                    -${size} -${size} 0 ${color},  
-                     0px -${size} 0 ${color},  
-                     ${size} -${size} 0 ${color},  
-                     ${size}  0px 0 ${color},  
-                     ${size}  ${size} 0 ${color},  
-                     0px  ${size} 0 ${color},  
-                    -${size}  ${size} 0 ${color},  
-                    -${size}  0px 0 ${color}
+                    -${size} -${size} 0 ${color}, 0px -${size} 0 ${color}, ${size} -${size} 0 ${color},  
+                    ${size} 0px 0 ${color}, ${size} ${size} 0 ${color}, 0px ${size} 0 ${color},  
+                    -${size} ${size} 0 ${color}, -${size} 0px 0 ${color}
                 `;
             }
         }
 
-        // Función para procesar y aplicar el color del texto personalizado
         function aplicarTextColor(elemento, textColorStr) {
             if (!textColorStr) return;
-
             const parts = textColorStr.trim().split(/\s+/);
+            if (parts[0].toLowerCase() === 'true' && parts.length >= 2) elemento.style.color = parts[1];
+        }
 
-            if (parts[0].toLowerCase() === 'true' && parts.length >= 2) {
-                const color = parts[1]; // ej: #000000
-                elemento.style.color = color;
+        function aplicarTamañoImagen(imgElement, sizeStr) {
+            if (!sizeStr) return;
+            const parts = sizeStr.toLowerCase().split('x');
+            if (parts.length === 2) {
+                let width = parts[0].trim();
+                let height = parts[1].trim();
+                if (/^\d+$/.test(width)) width += 'px';
+                if (/^\d+$/.test(height)) height += 'px';
+                imgElement.style.width = width;
+                imgElement.style.height = height;
             }
         }
 
-        // Dibuja los elementos
+        // La función matemática para el plano cartesiano (-512 a 512)
+        function aplicarTextPlace(elemento, coordStr) {
+            if (!coordStr) return;
+            
+            const parts = coordStr.trim().split(/\s+/);
+            if (parts.length >= 2) {
+                const x = parseFloat(parts[0]);
+                const y = parseFloat(parts[1]);
+
+                if (!isNaN(x) && !isNaN(y)) {
+                    // Limitamos matemáticamente los valores entre -512 y 512 por seguridad
+                    const clampX = Math.max(-512, Math.min(512, x));
+                    const clampY = Math.max(-512, Math.min(512, y));
+
+                    // Mapeo a porcentajes
+                    const leftPercent = 50 + ((clampX / 512) * 50);
+                    const topPercent = 50 - ((clampY / 512) * 50);
+
+                    // Liberamos el elemento de la cuadrícula normal y lo fijamos en la coordenada
+                    elemento.style.position = 'absolute';
+                    elemento.style.left = `${leftPercent}%`;
+                    elemento.style.top = `${topPercent}%`;
+                    
+                    // Aseguramos que la coordenada X,Y apunte exactamente al centro de la palabra
+                    elemento.style.transform = 'translate(-50%, -50%)';
+                    
+                    // Al ser flotante, evitamos que rompa clics en la imagen de fondo
+                    elemento.style.pointerEvents = 'none'; 
+                }
+            }
+        }
+
         function renderHub(pages) {
             const hub = document.getElementById('hub');
             hub.innerHTML = ''; 
@@ -212,7 +220,6 @@
             pages.forEach(page => {
                 const a = document.createElement('a');
                 a.className = 'tile';
-                a.target = '_blank';
                 
                 let url = page.url || '#';
                 if (url !== '#' && !url.startsWith('http://') && !url.startsWith('https://')) {
@@ -220,33 +227,30 @@
                 }
                 a.href = url;
 
-                // Asignar Color de Fondo (Ignorando explícitamente 'false')
-                if (page.color && page.color.toLowerCase() !== 'false') {
-                    a.style.backgroundColor = page.color;
-                }
+                if (page.color && page.color.toLowerCase() !== 'false') a.style.backgroundColor = page.color;
 
-                // Asignar Posición
                 const gridPos = parseGridOrder(page.order);
-                if (gridPos) {
-                    a.style.gridArea = `${gridPos.row} / ${gridPos.col} / ${gridPos.row + 1} / ${gridPos.col + 1}`;
-                }
+                if (gridPos) a.style.gridArea = `${gridPos.row} / ${gridPos.col} / ${gridPos.row + 1} / ${gridPos.col + 1}`;
 
                 const img = document.createElement('img');
                 img.src = page.icon || '';
                 img.alt = page.name || 'Icono';
                 img.onerror = () => { img.style.display = 'none'; };
+                
+                if (page['img-size']) aplicarTamañoImagen(img, page['img-size']);
 
                 const span = document.createElement('span');
                 span.textContent = page.name || 'Sin Nombre';
 
-                // Aplicar el contorno personalizado si existe
-                if (page['text-outline']) {
-                    aplicarTextOutline(span, page['text-outline']);
-                }
+                if (page['text-outline']) aplicarTextOutline(span, page['text-outline']);
+                if (page['text-color']) aplicarTextColor(span, page['text-color']);
+                
+                // Procesar las coordenadas cartesianas
+                if (page['text-place']) aplicarTextPlace(span, page['text-place']);
 
-                // Aplicar el color de texto personalizado si existe
-                if (page['text-color']) {
-                    aplicarTextColor(span, page['text-color']);
+                // Centrar la imagen si se usa posición absoluta para el texto
+                if (page['text-place']) {
+                    img.style.margin = '0';
                 }
 
                 a.appendChild(img);
