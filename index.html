@@ -44,7 +44,7 @@
             box-sizing: border-box;
             width: 100%;
             height: 100%;
-            position: relative; /* Crucial para que las coordenadas (text-place) no se salgan del cuadrado */
+            position: relative;
         }
 
         .tile:hover {
@@ -61,11 +61,12 @@
         }
 
         .tile span {
-            font-size: 14px;
+            font-size: 14px; /* Tamaño predeterminado si no se usa text-size */
             font-weight: 600;
             text-align: center;
             letter-spacing: 0.5px;
-            z-index: 2; /* Asegura que el texto siempre quede por encima de la imagen si se cruzan */
+            z-index: 2;
+            line-height: 1.2;
         }
 
         #mensaje {
@@ -84,53 +85,60 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            Promise.allSettled([
-                fetch('pages.ini').then(res => res.ok ? res.text() : Promise.reject('No pages.ini')),
-                fetch('pages_64.ini').then(res => res.ok ? res.text() : Promise.reject('No pages_64.ini'))
-            ]).then(results => {
-                let todasLasPaginas = [];
-
-                if (results[0].status === 'fulfilled') todasLasPaginas = todasLasPaginas.concat(parseCustomINI(results[0].value, false));
-                if (results[1].status === 'fulfilled') todasLasPaginas = todasLasPaginas.concat(parseCustomINI(results[1].value, true));
-
-                if (todasLasPaginas.length === 0) {
-                    document.getElementById('mensaje').innerText = 'No se encontraron accesos directos o no hay servidor local activo.';
-                    return;
-                }
-                renderHub(todasLasPaginas);
-            });
+            fetch('pages.ini')
+                .then(response => {
+                    if (!response.ok) throw new Error('No pages.ini');
+                    return response.text();
+                })
+                .then(text => {
+                    const paginas = parseHubData(text);
+                    if (paginas.length === 0) {
+                        document.getElementById('mensaje').innerText = 'El archivo pages.ini está vacío o no tiene el formato correcto.';
+                        return;
+                    }
+                    renderHub(paginas);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('mensaje').innerText = 'No se encontró pages.ini o no hay servidor local activo.';
+                });
         });
 
-        function parseCustomINI(text, isBase64) {
-            const lines = text.split('\n');
+        function parseHubData(text) {
             const pages = [];
-            let currentPage = {};
+            const blocks = text.match(/\{([\s\S]*?)\}/g);
+            
+            if (!blocks) return pages;
 
-            lines.forEach(line => {
-                line = line.trim();
-                
-                if (line === '') {
-                    if (Object.keys(currentPage).length > 0) {
-                        pages.push(currentPage);
-                        currentPage = {};
+            blocks.forEach(block => {
+                const currentPage = {};
+                const content = block.replace(/^\{|\}$/g, '');
+                const lines = content.split('\n');
+
+                lines.forEach(line => {
+                    line = line.trim();
+                    if (line === '' || line.startsWith('//')) return;
+
+                    const separatorIndex = line.indexOf(':');
+                    if (separatorIndex !== -1) {
+                        const key = line.substring(0, separatorIndex).trim().toLowerCase();
+                        let value = line.substring(separatorIndex + 1).trim();
+
+                        if (key === 'url64') {
+                            try { 
+                                currentPage['url'] = atob(value); 
+                            } catch (e) { 
+                                currentPage['url'] = '#'; 
+                            }
+                        } else {
+                            currentPage[key] = value;
+                        }
                     }
-                    return;
-                }
+                });
 
-                const separatorIndex = line.indexOf(':');
-                if (separatorIndex !== -1) {
-                    const key = line.substring(0, separatorIndex).trim().toLowerCase();
-                    let value = line.substring(separatorIndex + 1).trim();
-
-                    if (isBase64 && key === 'url') {
-                        try { value = atob(value); } 
-                        catch (e) { value = '#'; }
-                    }
-                    currentPage[key] = value;
-                }
+                if (Object.keys(currentPage).length > 0) pages.push(currentPage);
             });
 
-            if (Object.keys(currentPage).length > 0) pages.push(currentPage);
             return pages;
         }
 
@@ -181,7 +189,6 @@
             }
         }
 
-        // La función matemática para el plano cartesiano (-512 a 512)
         function aplicarTextPlace(elemento, coordStr) {
             if (!coordStr) return;
             
@@ -191,33 +198,50 @@
                 const y = parseFloat(parts[1]);
 
                 if (!isNaN(x) && !isNaN(y)) {
-                    // Limitamos matemáticamente los valores entre -512 y 512 por seguridad
                     const clampX = Math.max(-512, Math.min(512, x));
                     const clampY = Math.max(-512, Math.min(512, y));
 
-                    // Mapeo a porcentajes
                     const leftPercent = 50 + ((clampX / 512) * 50);
                     const topPercent = 50 - ((clampY / 512) * 50);
 
-                    // Liberamos el elemento de la cuadrícula normal y lo fijamos en la coordenada
                     elemento.style.position = 'absolute';
                     elemento.style.left = `${leftPercent}%`;
                     elemento.style.top = `${topPercent}%`;
-                    
-                    // Aseguramos que la coordenada X,Y apunte exactamente al centro de la palabra
                     elemento.style.transform = 'translate(-50%, -50%)';
-                    
-                    // Al ser flotante, evitamos que rompa clics en la imagen de fondo
                     elemento.style.pointerEvents = 'none'; 
                 }
             }
+        }
+
+        function aplicarFuenteCustom(span, fontUrl, index) {
+            if (!fontUrl || fontUrl.toLowerCase() === 'false') return;
+            const fontName = 'HubFont_' + index;
+            const customFont = new FontFace(fontName, `url(${fontUrl})`);
+            
+            customFont.load().then((loadedFont) => {
+                document.fonts.add(loadedFont);
+                span.style.fontFamily = fontName;
+            }).catch(err => {
+                console.error('Error cargando la fuente:', fontUrl, err);
+            });
+        }
+
+        // NUEVO: Función para procesar y aplicar el tamaño de texto personalizado
+        function aplicarTextSize(elemento, sizeStr) {
+            if (!sizeStr) return;
+            let size = sizeStr.trim();
+            // Si es solo un número (ej. "20" o "20.5"), le añadimos 'px'
+            if (/^\d+(\.\d+)?$/.test(size)) {
+                size += 'px';
+            }
+            elemento.style.fontSize = size;
         }
 
         function renderHub(pages) {
             const hub = document.getElementById('hub');
             hub.innerHTML = ''; 
 
-            pages.forEach(page => {
+            pages.forEach((page, index) => {
                 const a = document.createElement('a');
                 a.className = 'tile';
                 
@@ -240,15 +264,18 @@
                 if (page['img-size']) aplicarTamañoImagen(img, page['img-size']);
 
                 const span = document.createElement('span');
-                span.textContent = page.name || 'Sin Nombre';
+                let rawName = page.name || 'Sin Nombre';
+                
+                span.innerHTML = rawName.replace(/\^/g, '&nbsp;').replace(/¬/g, '<br>');
 
                 if (page['text-outline']) aplicarTextOutline(span, page['text-outline']);
                 if (page['text-color']) aplicarTextColor(span, page['text-color']);
-                
-                // Procesar las coordenadas cartesianas
                 if (page['text-place']) aplicarTextPlace(span, page['text-place']);
+                if (page['font']) aplicarFuenteCustom(span, page['font'], index);
+                
+                // Aplicar la nueva propiedad text-size
+                if (page['text-size']) aplicarTextSize(span, page['text-size']);
 
-                // Centrar la imagen si se usa posición absoluta para el texto
                 if (page['text-place']) {
                     img.style.margin = '0';
                 }
