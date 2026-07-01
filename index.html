@@ -86,6 +86,11 @@
             align-items: center;
         }
 
+        /* Transicion propia de los contenedores que se intercambian con la pagina */
+        .nav-container, #arrow-up-container, #arrow-down-container {
+            transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.1, 0.9, 0.2, 1);
+        }
+
         .nav-arrow { 
             font-size: 40px;
             color: #ffffff;
@@ -195,6 +200,8 @@
         let inputMode = 'keyboard';
         
         let navTimeouts = [];
+        let topControlState = 'nav'; // 'nav' | 'arrow-up'
+        let downArrowVisible = false;
 
         document.addEventListener('DOMContentLoaded', () => {
             fetch('pages.ini')
@@ -272,11 +279,6 @@
             return `nav-item slot-${pos}`;
         }
 
-        // La pestaña que pierde el foco (estaba en slot 1) siempre hace:
-        // 1) se empuja fuera de vista (slot -1, solo posicion, sin fade)
-        // 2) una vez ahi, se desvanece en 0.5s
-        // 3) teletransporte invisible al slot 6
-        // 4) cascada de entrada slot por slot hasta su posicion final
         function animateNavWrap(div, targetPos) {
             div.style.transition = '';
             div.style.opacity = '';
@@ -289,7 +291,7 @@
                 const t2 = setTimeout(() => {
                     div.style.transition = 'none';
                     div.className = 'nav-item slot-hidden-right';
-                    void div.offsetWidth; // reflow
+                    void div.offsetWidth;
 
                     div.style.transition = '';
                     let pos = 6;
@@ -350,7 +352,6 @@
                 if (isNaN(currentPos)) currentPos = targetPos;
 
                 if (currentPos === 1 && i !== currentSectionIdx) {
-                    // Esta pestaña estaba enfocada y deja de estarlo: animacion de salida en cascada
                     animateNavWrap(div, targetPos);
                     div.setAttribute('data-pos', targetPos);
                     return;
@@ -365,8 +366,6 @@
             updateVisualFocus();
         }
 
-        // Recarga real: resetea a la primera pagina y reconstruye el grid.
-        // SOLO se invoca por click en el titulo o Enter con el titulo enfocado.
         function switchSection(index) {
             currentSectionIdx = index;
             const availablePages = Object.keys(seccionesGlobales[index].pages).map(Number).sort((a,b)=>a-b);
@@ -393,6 +392,64 @@
             }
         }
 
+        // Crossfade + slide entre el titulo de la pestaña y la flecha de subir,
+        // sincronizado con el mismo ritmo (250ms) que usan los tiles del grid.
+        function updateTopControls(showNav) {
+            const navContainer = document.getElementById('nav-container');
+            const arrowUpContainer = document.getElementById('arrow-up-container');
+            const desired = showNav ? 'nav' : 'arrow-up';
+
+            if (desired === topControlState) return;
+            topControlState = desired;
+
+            const outEl = showNav ? arrowUpContainer : navContainer;
+            const inEl = showNav ? navContainer : arrowUpContainer;
+
+            outEl.style.opacity = '0';
+            outEl.style.transform = 'translateY(-14px)';
+
+            setTimeout(() => {
+                outEl.style.display = 'none';
+                outEl.style.transition = 'none';
+                outEl.style.opacity = '';
+                outEl.style.transform = '';
+                void outEl.offsetWidth;
+                outEl.style.transition = '';
+
+                inEl.style.transition = 'none';
+                inEl.style.display = showNav ? 'block' : 'flex';
+                inEl.style.opacity = '0';
+                inEl.style.transform = 'translateY(14px)';
+                void inEl.offsetWidth;
+                inEl.style.transition = '';
+                inEl.style.opacity = '1';
+                inEl.style.transform = 'translateY(0)';
+            }, 250);
+        }
+
+        function updateDownArrow(show) {
+            const arrowDownContainer = document.getElementById('arrow-down-container');
+            if (show === downArrowVisible) return;
+            downArrowVisible = show;
+
+            if (show) {
+                arrowDownContainer.style.transition = 'none';
+                arrowDownContainer.style.display = 'flex';
+                arrowDownContainer.style.opacity = '0';
+                arrowDownContainer.style.transform = 'translateY(-10px)';
+                void arrowDownContainer.offsetWidth;
+                arrowDownContainer.style.transition = '';
+                arrowDownContainer.style.opacity = '1';
+                arrowDownContainer.style.transform = 'translateY(0)';
+            } else {
+                arrowDownContainer.style.opacity = '0';
+                arrowDownContainer.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    if (!downArrowVisible) arrowDownContainer.style.display = 'none';
+                }, 250);
+            }
+        }
+
         function executeBuildHub() {
             const hub = document.getElementById('hub');
             hub.innerHTML = '';
@@ -401,27 +458,11 @@
             const availablePages = Object.keys(currentSection.pages).map(Number).sort((a,b)=>a-b);
             const pageData = currentSection.pages[currentPageIdx] || [];
 
-            const navContainer = document.getElementById('nav-container');
-            const arrowUpContainer = document.getElementById('arrow-up-container');
-            const arrowDownContainer = document.getElementById('arrow-down-container');
-
             const idxInArr = availablePages.indexOf(currentPageIdx);
             const isSinglePage = availablePages.length <= 1;
 
-            // Con una sola pagina el titulo SIEMPRE se muestra, sin importar el estado previo
-            if (isSinglePage || idxInArr <= 0) {
-                navContainer.style.display = 'block';
-                arrowUpContainer.style.display = 'none';
-            } else {
-                navContainer.style.display = 'none';
-                arrowUpContainer.style.display = 'flex';
-            }
-
-            if (!isSinglePage && idxInArr < availablePages.length - 1) {
-                arrowDownContainer.style.display = 'flex';
-            } else {
-                arrowDownContainer.style.display = 'none';
-            }
+            updateTopControls(isSinglePage || idxInArr <= 0);
+            updateDownArrow(!isSinglePage && idxInArr < availablePages.length - 1);
 
             pageData.forEach((page, index) => {
                 const a = document.createElement('a');
@@ -558,17 +599,14 @@
 
                 if (focusType === 'nav') {
                     if (e.key === 'ArrowRight') {
-                        // Solo mueve el carrusel/highlight, NO recarga el grid
                         currentSectionIdx = (currentSectionIdx + 1) % seccionesGlobales.length;
                         renderNav();
                     } else if (e.key === 'ArrowLeft') {
                         currentSectionIdx = (currentSectionIdx - 1 + seccionesGlobales.length) % seccionesGlobales.length;
                         renderNav();
                     } else if (e.key === 'Enter') {
-                        // Unica forma de "recargar" por teclado, equivalente al click
                         switchSection(currentSectionIdx);
                     } else if (e.key === 'ArrowDown') {
-                        // Al entrar al grid se confirma/recarga la seccion resaltada
                         switchSection(currentSectionIdx);
                         focusType = 'grid';
                         focusedGridRow = 1; focusedGridCol = 1;
@@ -632,7 +670,6 @@
             }
         }
 
-        // Soporta 1 o varias coordenadas separadas por '&' (ej: "1d&1e") para tiles multi-celda
         function parseGridOrder(orderStr) {
             if (!orderStr) return null;
             const coords = orderStr.trim().toLowerCase().split('&').map(s => s.trim()).filter(Boolean);
