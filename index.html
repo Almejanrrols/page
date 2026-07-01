@@ -5,31 +5,116 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Almejanrrols Hub</title>
     <style>
-        /* CSS: Estilos base */
+        :root {
+            --font-family: 'Segoe UI Light', 'Segoe UI', 'SF Pro Light', 'SF Pro Display', 'SF Pro', sans-serif;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: var(--font-family);
             background-color: #1e1e1e;
             color: #ffffff;
             margin: 0;
-            padding: 50px;
+            padding: 40px;
             display: flex;
             justify-content: center;
             align-items: flex-start;
             min-height: 100vh;
             box-sizing: border-box;
-            overflow-x: auto; 
+            overflow: hidden;
         }
 
-        /* La cuadrícula tipo Windows 8 */
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            width: 1070px;
+            position: relative;
+        }
+
+        .top-control-wrapper {
+            width: 100%;
+            height: 50px;
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .nav-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .nav-header {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .nav-item {
+            position: absolute;
+            font-size: 28px;
+            font-weight: 300;
+            cursor: pointer;
+            opacity: 0.75; 
+            color: #ffffff;
+            white-space: nowrap;
+            user-select: none;
+            transition: left 0.45s cubic-bezier(0.1, 0.9, 0.2, 1), 
+                        opacity 0.45s ease;
+        }
+
+        .nav-item.slot-hidden-left  { left: -160px; opacity: 0 !important; pointer-events: none; }
+        .nav-item.slot-parked-left  { left: -160px; }
+        .nav-item.slot-1            { left: 0px; }
+        .nav-item.slot-2            { left: 150px; }
+        .nav-item.slot-3            { left: 300px; }
+        .nav-item.slot-4            { left: 450px; }
+        .nav-item.slot-5            { left: 600px; }
+        .nav-item.slot-hidden-right { left: 760px; opacity: 0 !important; pointer-events: none; }
+
+        .nav-item.focused {
+            opacity: 1 !important;
+            font-weight: 400;
+        }
+
+        .arrow-container {
+            width: 100%;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .nav-arrow { 
+            font-size: 40px;
+            color: #ffffff;
+            opacity: 0.5;
+            cursor: pointer; 
+            user-select: none;
+            line-height: 1;
+            transition: opacity 0.2s, transform 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+        }
+
+        .nav-arrow.focused {
+            opacity: 1 !important;
+            transform: scale(1.15);
+        }
+
+        #arrow-down-container {
+            margin-top: 25px;
+        }
+
         .hub-grid {
             display: grid;
-            grid-auto-columns: 140px;
-            grid-auto-rows: 140px;
+            grid-template-columns: repeat(7, 140px);
+            grid-template-rows: repeat(3, 140px);
             gap: 15px;
-            grid-auto-flow: row dense; 
+            position: relative;
+            width: 1070px;
+            height: 450px;
         }
 
-        /* Estilo de cada "Tile" (cuadrado) */
         .tile {
             background-color: #0078D7;
             text-decoration: none;
@@ -40,133 +125,548 @@
             justify-content: center;
             padding: 15px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.2s ease;
             box-sizing: border-box;
             width: 100%;
             height: 100%;
             position: relative;
+            
+            opacity: 0;
+            transform: scale(0.9);
+            
+            transition: opacity 0.25s ease, 
+                        transform 0.25s cubic-bezier(0.1, 0.9, 0.2, 1), 
+                        outline 0.15s ease;
         }
 
-        .tile:hover {
-            transform: scale(1.1);
-            filter: brightness(0.85);
-            z-index: 10;
+        .tile.fade-in {
+            opacity: 1;
+            transform: scale(1);
         }
 
-        .tile img {
-            width: 48px;
-            height: 48px;
-            object-fit: contain;
-            margin-bottom: 15px;
+        .tile.fade-out {
+            opacity: 0 !important;
+            transform: scale(0.85);
         }
 
-        .tile span {
-            font-size: 14px; /* Tamaño predeterminado si no se usa text-size */
-            font-weight: 600;
-            text-align: center;
-            letter-spacing: 0.5px;
-            z-index: 2;
-            line-height: 1.2;
+        .tile.focused {
+            transform: scale(1.04) !important;
+            filter: brightness(1.08);
+            z-index: 50;
+            outline: 3px solid var(--crosshair-color, #ffffff);
         }
 
-        #mensaje {
-            grid-column: 1 / -1;
-            text-align: center;
-            font-size: 1.2rem;
-            color: #aaa;
-        }
+        .tile img { width: 48px; height: 48px; object-fit: contain; margin-bottom: 15px; }
+        .tile span { font-size: 14px; font-weight: 600; text-align: center; letter-spacing: 0.5px; z-index: 2; line-height: 1.2; }
+        #mensaje { grid-column: 1 / -1; font-size: 1.2rem; color: #aaa; }
     </style>
 </head>
 <body>
 
-    <div class="hub-grid" id="hub">
-        <div id="mensaje">Cargando accesos directos...</div>
+    <div class="main-container">
+        <div class="top-control-wrapper">
+            <div class="nav-container" id="nav-container">
+                <div class="nav-header" id="nav-header"></div>
+            </div>
+            <div id="arrow-up-container" class="arrow-container" style="display: none;">
+                <div class="nav-arrow" id="btn-up">🢁</div>
+            </div>
+        </div>
+
+        <div class="hub-grid" id="hub">
+            <div id="mensaje">Cargando interfaz...</div>
+        </div>
+
+        <div id="arrow-down-container" class="arrow-container" style="display: none;">
+            <div class="nav-arrow" id="btn-down">🢃</div>
+        </div>
     </div>
 
     <script>
+        let seccionesGlobales = [];
+        let currentSectionIdx = 0;
+        let currentPageIdx = 1;
+
+        let focusType = 'nav';
+        let focusedGridRow = 1;
+        let focusedGridCol = 1;
+
+        // 'keyboard' -> flechas son solo indicadoras (cambio de pagina automatico en el borde del grid)
+        // 'mouse'    -> flechas son tiles reales (hover + click)
+        let inputMode = 'keyboard';
+        
+        let navTimeouts = [];
+
         document.addEventListener('DOMContentLoaded', () => {
             fetch('pages.ini')
                 .then(response => {
-                    if (!response.ok) throw new Error('No pages.ini');
+                    if (!response.ok) throw new Error('No se pudo leer pages.ini');
                     return response.text();
                 })
                 .then(text => {
-                    const paginas = parseHubData(text);
-                    if (paginas.length === 0) {
-                        document.getElementById('mensaje').innerText = 'El archivo pages.ini está vacío o no tiene el formato correcto.';
-                        return;
-                    }
-                    renderHub(paginas);
+                    seccionesGlobales = parseHubData(text);
+                    if (seccionesGlobales.length === 0) return;
+                    renderNav();
+                    switchSection(0);
+                    initKeyboardControls();
                 })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('mensaje').innerText = 'No se encontró pages.ini o no hay servidor local activo.';
-                });
+                .catch(error => { console.error(error); });
         });
 
         function parseHubData(text) {
-            const pages = [];
-            const blocks = text.match(/\{([\s\S]*?)\}/g);
-            
-            if (!blocks) return pages;
+            const sections = [];
+            let currentSectionName = "General"; 
+            let currentSectionText = "";
 
+            text.split('\n').forEach(line => {
+                const trimmed = line.trim();
+                if (trimmed.startsWith('--')) {
+                    if (currentSectionText.trim()) {
+                        sections.push({ name: currentSectionName, pages: parsePages(currentSectionText) });
+                    }
+                    currentSectionName = trimmed.replace(/^-+|-+$/g, '').trim() || "Sección";
+                    currentSectionText = "";
+                } else {
+                    currentSectionText += line + '\n';
+                }
+            });
+
+            if (currentSectionText.trim()) {
+                sections.push({ name: currentSectionName, pages: parsePages(currentSectionText) });
+            }
+            return sections;
+        }
+
+        function parsePages(text) {
+            const pagesMap = {};
+            const blocks = text.match(/\{([\s\S]*?)\}/g) || [];
+            
             blocks.forEach(block => {
                 const currentPage = {};
-                const content = block.replace(/^\{|\}$/g, '');
-                const lines = content.split('\n');
-
-                lines.forEach(line => {
-                    line = line.trim();
-                    if (line === '' || line.startsWith('//')) return;
-
-                    const separatorIndex = line.indexOf(':');
-                    if (separatorIndex !== -1) {
-                        const key = line.substring(0, separatorIndex).trim().toLowerCase();
-                        let value = line.substring(separatorIndex + 1).trim();
-
+                block.replace(/^\{|\}$/g, '').split('\n').forEach(line => {
+                    const sep = line.indexOf(':');
+                    if (sep !== -1) {
+                        const key = line.substring(0, sep).trim().toLowerCase();
+                        const val = line.substring(sep + 1).trim();
                         if (key === 'url64') {
-                            try { 
-                                currentPage['url'] = atob(value); 
-                            } catch (e) { 
-                                currentPage['url'] = '#'; 
-                            }
+                            try { currentPage['url'] = atob(val); } catch(e) { currentPage['url'] = '#'; }
                         } else {
-                            currentPage[key] = value;
+                            currentPage[key] = val;
                         }
                     }
                 });
 
-                if (Object.keys(currentPage).length > 0) pages.push(currentPage);
+                if (Object.keys(currentPage).length > 0) {
+                    const pgNum = parseInt(currentPage.page) || 1;
+                    if (!pagesMap[pgNum]) pagesMap[pgNum] = [];
+                    pagesMap[pgNum].push(currentPage);
+                }
             });
-
-            return pages;
+            return pagesMap;
         }
 
+        // ---- Carrusel de pestañas ----
+
+        function slotClassName(pos) {
+            if (pos <= 0) return 'nav-item slot-hidden-left';
+            if (pos >= 6) return 'nav-item slot-hidden-right';
+            return `nav-item slot-${pos}`;
+        }
+
+        // La pestaña que pierde el foco (estaba en slot 1) siempre hace:
+        // 1) se empuja fuera de vista (slot -1, solo posicion, sin fade)
+        // 2) una vez ahi, se desvanece en 0.5s
+        // 3) teletransporte invisible al slot 6
+        // 4) cascada de entrada slot por slot hasta su posicion final
+        function animateNavWrap(div, targetPos) {
+            div.style.transition = '';
+            div.style.opacity = '';
+            div.className = 'nav-item slot-parked-left';
+
+            const t1 = setTimeout(() => {
+                div.style.transition = 'opacity 0.5s ease';
+                div.style.opacity = '0';
+
+                const t2 = setTimeout(() => {
+                    div.style.transition = 'none';
+                    div.className = 'nav-item slot-hidden-right';
+                    void div.offsetWidth; // reflow
+
+                    div.style.transition = '';
+                    let pos = 6;
+                    const stepIn = () => {
+                        pos -= 1;
+                        div.className = slotClassName(pos);
+                        if (pos === targetPos) {
+                            div.style.opacity = '';
+                        } else {
+                            const t3 = setTimeout(stepIn, 140);
+                            navTimeouts.push(t3);
+                        }
+                    };
+                    stepIn();
+                }, 500);
+                navTimeouts.push(t2);
+            }, 450);
+            navTimeouts.push(t1);
+        }
+
+        function renderNav() {
+            const nav = document.getElementById('nav-header');
+            const N = seccionesGlobales.length;
+            
+            if (nav.children.length === 0) {
+                seccionesGlobales.forEach((seccion, i) => {
+                    const div = document.createElement('div');
+                    div.className = 'nav-item';
+                    div.innerText = seccion.name;
+                    div.setAttribute('data-index', i);
+                    
+                    div.onmouseenter = () => {
+                        inputMode = 'mouse';
+                        focusType = 'nav';
+                        currentSectionIdx = i; 
+                        updateVisualFocus();
+                    };
+                    div.onclick = () => {
+                        switchSection(i);
+                    };
+                    nav.appendChild(div);
+                });
+            }
+
+            navTimeouts.forEach(clearTimeout);
+            navTimeouts = [];
+
+            seccionesGlobales.forEach((seccion, i) => {
+                const div = nav.children[i];
+                
+                let diff = (i - currentSectionIdx) % N;
+                if (diff < 0) diff += N;
+                
+                let targetPos = diff + 1;
+                if (targetPos > 5) targetPos = 6;
+                
+                let currentPos = parseInt(div.getAttribute('data-pos'));
+                if (isNaN(currentPos)) currentPos = targetPos;
+
+                if (currentPos === 1 && i !== currentSectionIdx) {
+                    // Esta pestaña estaba enfocada y deja de estarlo: animacion de salida en cascada
+                    animateNavWrap(div, targetPos);
+                    div.setAttribute('data-pos', targetPos);
+                    return;
+                }
+
+                div.style.transition = '';
+                div.style.opacity = '';
+                div.className = slotClassName(targetPos);
+                div.setAttribute('data-pos', targetPos);
+            });
+
+            updateVisualFocus();
+        }
+
+        // Recarga real: resetea a la primera pagina y reconstruye el grid.
+        // SOLO se invoca por click en el titulo o Enter con el titulo enfocado.
+        function switchSection(index) {
+            currentSectionIdx = index;
+            const availablePages = Object.keys(seccionesGlobales[index].pages).map(Number).sort((a,b)=>a-b);
+            currentPageIdx = availablePages.length > 0 ? availablePages[0] : 1;
+            
+            renderNav();
+            animateAndRenderHub();
+        }
+
+        function animateAndRenderHub() {
+            const hub = document.getElementById('hub');
+            const tilesExistentes = hub.querySelectorAll('.tile');
+            
+            if (tilesExistentes.length > 0) {
+                tilesExistentes.forEach(tile => {
+                    const row = parseInt(tile.getAttribute('data-row')) || 1;
+                    const col = parseInt(tile.getAttribute('data-col')) || 1;
+                    const delay = ((row - 1) * 7 + (col - 1)) * 10; 
+                    setTimeout(() => { tile.classList.add('fade-out'); }, delay);
+                });
+                setTimeout(() => { executeBuildHub(); }, 450);
+            } else {
+                executeBuildHub();
+            }
+        }
+
+        function executeBuildHub() {
+            const hub = document.getElementById('hub');
+            hub.innerHTML = '';
+
+            const currentSection = seccionesGlobales[currentSectionIdx];
+            const availablePages = Object.keys(currentSection.pages).map(Number).sort((a,b)=>a-b);
+            const pageData = currentSection.pages[currentPageIdx] || [];
+
+            const navContainer = document.getElementById('nav-container');
+            const arrowUpContainer = document.getElementById('arrow-up-container');
+            const arrowDownContainer = document.getElementById('arrow-down-container');
+
+            const idxInArr = availablePages.indexOf(currentPageIdx);
+            const isSinglePage = availablePages.length <= 1;
+
+            // Con una sola pagina el titulo SIEMPRE se muestra, sin importar el estado previo
+            if (isSinglePage || idxInArr <= 0) {
+                navContainer.style.display = 'block';
+                arrowUpContainer.style.display = 'none';
+            } else {
+                navContainer.style.display = 'none';
+                arrowUpContainer.style.display = 'flex';
+            }
+
+            if (!isSinglePage && idxInArr < availablePages.length - 1) {
+                arrowDownContainer.style.display = 'flex';
+            } else {
+                arrowDownContainer.style.display = 'none';
+            }
+
+            pageData.forEach((page, index) => {
+                const a = document.createElement('a');
+                a.className = 'tile';
+                
+                let url = page.url || '#';
+                if (url !== '#' && !url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
+                a.href = url;
+
+                if (page.color && page.color.toLowerCase() !== 'false') a.style.backgroundColor = page.color;
+
+                const gridPos = parseGridOrder(page.order);
+                if (gridPos) {
+                    a.style.gridArea = `${gridPos.rowStart} / ${gridPos.colStart} / ${gridPos.rowEnd + 1} / ${gridPos.colEnd + 1}`;
+                    a.setAttribute('data-cells', JSON.stringify(gridPos.cells));
+                    a.setAttribute('data-row', gridPos.rowStart);
+                    a.setAttribute('data-col', gridPos.colStart);
+
+                    a.onmouseenter = () => {
+                        inputMode = 'mouse';
+                        focusType = 'grid';
+                        focusedGridRow = gridPos.rowStart;
+                        focusedGridCol = gridPos.colStart;
+                        updateVisualFocus();
+                    };
+                }
+                
+                if (page['crosshair-change']) {
+                    const parts = page['crosshair-change'].trim().split(/\s+/);
+                    if (parts[0].toLowerCase() === 'true' && parts.length > 1) {
+                        a.style.setProperty('--crosshair-color', parts[1]);
+                    }
+                }
+
+                const img = document.createElement('img');
+                img.src = page.icon || '';
+                img.onerror = () => { img.style.display = 'none'; };
+                if (page['img-size']) aplicarTamañoImagen(img, page['img-size']);
+
+                const span = document.createElement('span');
+                span.innerHTML = (page.name || 'Sin Nombre').replace(/\^/g, '&nbsp;').replace(/¬/g, '<br>');
+
+                if (page['text-outline']) aplicarTextOutline(span, page['text-outline']);
+                if (page['text-color']) aplicarTextColor(span, page['text-color']);
+                if (page['text-place']) aplicarTextPlace(span, page['text-place']);
+                if (page['text-size']) aplicarTextSize(span, page['text-size']);
+                
+                if (page['font']) aplicarFuenteCustom(span, page['font'], index);
+
+                if (page['text-place']) img.style.margin = '0';
+
+                a.appendChild(img);
+                a.appendChild(span);
+                hub.appendChild(a);
+
+                if (gridPos) {
+                    const delay = ((gridPos.rowStart - 1) * 7 + (gridPos.colStart - 1)) * 12.5;
+                    setTimeout(() => { a.classList.add('fade-in'); }, delay);
+                } else {
+                    setTimeout(() => { a.classList.add('fade-in'); }, 20);
+                }
+            });
+
+            const btnUp = document.getElementById('btn-up');
+            if (btnUp) {
+                btnUp.onmouseenter = () => { inputMode = 'mouse'; focusType = 'arrow-up'; updateVisualFocus(); };
+                btnUp.onclick = () => { if (idxInArr > 0) { currentPageIdx = availablePages[idxInArr - 1]; focusedGridRow = 3; animateAndRenderHub(); } };
+            }
+
+            const btnDown = document.getElementById('btn-down');
+            if (btnDown) {
+                btnDown.onmouseenter = () => { inputMode = 'mouse'; focusType = 'arrow-down'; updateVisualFocus(); };
+                btnDown.onclick = () => { if (idxInArr < availablePages.length - 1) { currentPageIdx = availablePages[idxInArr + 1]; focusedGridRow = 1; animateAndRenderHub(); } };
+            }
+
+            updateVisualFocus();
+        }
+
+        function aplicarFuenteCustom(span, fontUrl, index) {
+            if (!fontUrl || fontUrl.toLowerCase() === 'false') return;
+
+            if (fontUrl.includes('fonts.googleapis.com')) {
+                let link = document.querySelector(`link[href="${fontUrl}"]`);
+                if (!link) {
+                    link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = fontUrl;
+                    document.head.appendChild(link);
+                }
+                
+                try {
+                    const url = new URL(fontUrl);
+                    const families = url.searchParams.getAll('family');
+                    if (families.length > 0) {
+                        let familyName = families[0].split(':')[0].split('@')[0];
+                        familyName = familyName.replace(/\+/g, ' ');
+                        span.style.fontFamily = `"${familyName}", var(--font-family)`;
+                    }
+                } catch(e) { console.error(e); }
+            } else {
+                const fontName = 'HubFont_' + index;
+                const customFont = new FontFace(fontName, `url(${fontUrl})`);
+                customFont.load().then(f => {
+                    document.fonts.add(f);
+                    span.style.fontFamily = fontName;
+                }).catch(err => console.error(err));
+            }
+        }
+
+        function findTileAtCell(row, col) {
+            const tiles = document.querySelectorAll('.tile[data-cells]');
+            for (const tile of tiles) {
+                try {
+                    const cells = JSON.parse(tile.getAttribute('data-cells'));
+                    if (cells.some(c => c.row === row && c.col === col)) return tile;
+                } catch(e) {}
+            }
+            return null;
+        }
+
+        function initKeyboardControls() {
+            window.addEventListener('keydown', (e) => {
+                if (!['ArrowRight','ArrowLeft','ArrowUp','ArrowDown','Enter'].includes(e.key)) return;
+
+                if (inputMode === 'mouse' && e.key !== 'Enter') {
+                    inputMode = 'keyboard';
+                    if (focusType === 'arrow-up') { focusType = 'grid'; focusedGridRow = 1; }
+                    else if (focusType === 'arrow-down') { focusType = 'grid'; focusedGridRow = 3; }
+                }
+
+                const currentSection = seccionesGlobales[currentSectionIdx];
+                const availablePages = Object.keys(currentSection.pages).map(Number).sort((a,b)=>a-b);
+                const pageIdxInArr = availablePages.indexOf(currentPageIdx);
+
+                if (focusType === 'nav') {
+                    if (e.key === 'ArrowRight') {
+                        // Solo mueve el carrusel/highlight, NO recarga el grid
+                        currentSectionIdx = (currentSectionIdx + 1) % seccionesGlobales.length;
+                        renderNav();
+                    } else if (e.key === 'ArrowLeft') {
+                        currentSectionIdx = (currentSectionIdx - 1 + seccionesGlobales.length) % seccionesGlobales.length;
+                        renderNav();
+                    } else if (e.key === 'Enter') {
+                        // Unica forma de "recargar" por teclado, equivalente al click
+                        switchSection(currentSectionIdx);
+                    } else if (e.key === 'ArrowDown') {
+                        // Al entrar al grid se confirma/recarga la seccion resaltada
+                        switchSection(currentSectionIdx);
+                        focusType = 'grid';
+                        focusedGridRow = 1; focusedGridCol = 1;
+                        updateVisualFocus();
+                    }
+                } else if (focusType === 'grid') {
+                    if (e.key === 'ArrowRight') {
+                        if (focusedGridCol < 7) focusedGridCol++;
+                        updateVisualFocus();
+                    } else if (e.key === 'ArrowLeft') {
+                        if (focusedGridCol > 1) focusedGridCol--;
+                        updateVisualFocus();
+                    } else if (e.key === 'ArrowUp') {
+                        if (focusedGridRow > 1) {
+                            focusedGridRow--;
+                            updateVisualFocus();
+                        } else if (pageIdxInArr > 0) {
+                            currentPageIdx = availablePages[pageIdxInArr - 1];
+                            focusedGridRow = 3;
+                            animateAndRenderHub();
+                        } else {
+                            focusType = 'nav';
+                            updateVisualFocus();
+                        }
+                    } else if (e.key === 'ArrowDown') {
+                        if (focusedGridRow < 3) {
+                            focusedGridRow++;
+                            updateVisualFocus();
+                        } else if (pageIdxInArr < availablePages.length - 1 && availablePages.length > 1) {
+                            currentPageIdx = availablePages[pageIdxInArr + 1];
+                            focusedGridRow = 1;
+                            animateAndRenderHub();
+                        }
+                    } else if (e.key === 'Enter') {
+                        const activeTile = document.querySelector('.tile.focused');
+                        if (activeTile) activeTile.click();
+                    }
+                } else if (focusType === 'arrow-up') {
+                    if (e.key === 'Enter') document.getElementById('btn-up').click();
+                } else if (focusType === 'arrow-down') {
+                    if (e.key === 'Enter') document.getElementById('btn-down').click();
+                }
+            });
+        }
+
+        function updateVisualFocus() {
+            document.querySelectorAll('.nav-item, .tile, .nav-arrow').forEach(el => el.classList.remove('focused'));
+
+            if (focusType === 'nav') {
+                const activeNav = document.querySelector(`.nav-item[data-index="${currentSectionIdx}"]`);
+                if (activeNav) activeNav.classList.add('focused');
+            } else if (focusType === 'grid') {
+                const activeTile = findTileAtCell(focusedGridRow, focusedGridCol);
+                if (activeTile) activeTile.classList.add('focused');
+            } else if (focusType === 'arrow-up') {
+                const btnUp = document.getElementById('btn-up');
+                if (btnUp) btnUp.classList.add('focused');
+            } else if (focusType === 'arrow-down') {
+                const btnDown = document.getElementById('btn-down');
+                if (btnDown) btnDown.classList.add('focused');
+            }
+        }
+
+        // Soporta 1 o varias coordenadas separadas por '&' (ej: "1d&1e") para tiles multi-celda
         function parseGridOrder(orderStr) {
             if (!orderStr) return null;
-            orderStr = orderStr.trim().toLowerCase();
-            const match = orderStr.match(/^([a-z]+)(\d+)$|^(\d+)([a-z]+)$/);
-            if (!match) return null;
-            const letters = match[1] || match[4];
-            const numbers = match[2] || match[3];
-            let col = 0;
-            for (let i = 0; i < letters.length; i++) {
-                col = col * 26 + (letters.charCodeAt(i) - 96);
-            }
-            return { row: parseInt(numbers, 10), col };
+            const coords = orderStr.trim().toLowerCase().split('&').map(s => s.trim()).filter(Boolean);
+            const cells = [];
+
+            coords.forEach(coord => {
+                const match = coord.match(/^([a-z]+)(\d+)$|^(\d+)([a-z]+)$/);
+                if (!match) return;
+                const letters = match[1] || match[4];
+                const numbers = match[2] || match[3];
+                let col = 0;
+                for (let i = 0; i < letters.length; i++) col = col * 26 + (letters.charCodeAt(i) - 96);
+                cells.push({ row: parseInt(numbers, 10), col });
+            });
+
+            if (cells.length === 0) return null;
+
+            const rows = cells.map(c => c.row);
+            const cols = cells.map(c => c.col);
+            return {
+                cells,
+                rowStart: Math.min(...rows),
+                rowEnd: Math.max(...rows),
+                colStart: Math.min(...cols),
+                colEnd: Math.max(...cols)
+            };
         }
 
         function aplicarTextOutline(elemento, outlineStr) {
             if (!outlineStr) return;
             const parts = outlineStr.trim().split(/\s+/);
             if (parts[0].toLowerCase() === 'true' && parts.length >= 3) {
-                const color = parts[1];
-                const size = parts[2];
-                elemento.style.textShadow = `
-                    -${size} -${size} 0 ${color}, 0px -${size} 0 ${color}, ${size} -${size} 0 ${color},  
-                    ${size} 0px 0 ${color}, ${size} ${size} 0 ${color}, 0px ${size} 0 ${color},  
-                    -${size} ${size} 0 ${color}, -${size} 0px 0 ${color}
-                `;
+                const color = parts[1], size = parts[2];
+                elemento.style.textShadow = `-${size} -${size} 0 ${color}, 0px -${size} 0 ${color}, ${size} -${size} 0 ${color}, ${size} 0px 0 ${color}, ${size} ${size} 0 ${color}, 0px ${size} 0 ${color}, -${size} ${size} 0 ${color}, -${size} 0px 0 ${color}`;
             }
         }
 
@@ -180,110 +680,32 @@
             if (!sizeStr) return;
             const parts = sizeStr.toLowerCase().split('x');
             if (parts.length === 2) {
-                let width = parts[0].trim();
-                let height = parts[1].trim();
-                if (/^\d+$/.test(width)) width += 'px';
-                if (/^\d+$/.test(height)) height += 'px';
-                imgElement.style.width = width;
-                imgElement.style.height = height;
+                let w = parts[0].trim(), h = parts[1].trim();
+                imgElement.style.width = /^\d+$/.test(w) ? w + 'px' : w;
+                imgElement.style.height = /^\d+$/.test(h) ? h + 'px' : h;
             }
         }
 
         function aplicarTextPlace(elemento, coordStr) {
             if (!coordStr) return;
-            
             const parts = coordStr.trim().split(/\s+/);
             if (parts.length >= 2) {
-                const x = parseFloat(parts[0]);
-                const y = parseFloat(parts[1]);
-
+                const x = parseFloat(parts[0]), y = parseFloat(parts[1]);
                 if (!isNaN(x) && !isNaN(y)) {
-                    const clampX = Math.max(-512, Math.min(512, x));
-                    const clampY = Math.max(-512, Math.min(512, y));
-
-                    const leftPercent = 50 + ((clampX / 512) * 50);
-                    const topPercent = 50 - ((clampY / 512) * 50);
-
                     elemento.style.position = 'absolute';
-                    elemento.style.left = `${leftPercent}%`;
-                    elemento.style.top = `${topPercent}%`;
+                    elemento.style.left = `${50 + ((Math.max(-512, Math.min(512, x)) / 512) * 50)}%`;
+                    elemento.style.top = `${50 - ((Math.max(-512, Math.min(512, y)) / 512) * 50)}%`;
                     elemento.style.transform = 'translate(-50%, -50%)';
                     elemento.style.pointerEvents = 'none'; 
                 }
             }
         }
 
-        function aplicarFuenteCustom(span, fontUrl, index) {
-            if (!fontUrl || fontUrl.toLowerCase() === 'false') return;
-            const fontName = 'HubFont_' + index;
-            const customFont = new FontFace(fontName, `url(${fontUrl})`);
-            
-            customFont.load().then((loadedFont) => {
-                document.fonts.add(loadedFont);
-                span.style.fontFamily = fontName;
-            }).catch(err => {
-                console.error('Error cargando la fuente:', fontUrl, err);
-            });
-        }
-
-        // NUEVO: Función para procesar y aplicar el tamaño de texto personalizado
         function aplicarTextSize(elemento, sizeStr) {
             if (!sizeStr) return;
             let size = sizeStr.trim();
-            // Si es solo un número (ej. "20" o "20.5"), le añadimos 'px'
-            if (/^\d+(\.\d+)?$/.test(size)) {
-                size += 'px';
-            }
+            if (/^\d+(\.\d+)?$/.test(size)) size += 'px';
             elemento.style.fontSize = size;
-        }
-
-        function renderHub(pages) {
-            const hub = document.getElementById('hub');
-            hub.innerHTML = ''; 
-
-            pages.forEach((page, index) => {
-                const a = document.createElement('a');
-                a.className = 'tile';
-                
-                let url = page.url || '#';
-                if (url !== '#' && !url.startsWith('http://') && !url.startsWith('https://')) {
-                    url = 'https://' + url;
-                }
-                a.href = url;
-
-                if (page.color && page.color.toLowerCase() !== 'false') a.style.backgroundColor = page.color;
-
-                const gridPos = parseGridOrder(page.order);
-                if (gridPos) a.style.gridArea = `${gridPos.row} / ${gridPos.col} / ${gridPos.row + 1} / ${gridPos.col + 1}`;
-
-                const img = document.createElement('img');
-                img.src = page.icon || '';
-                img.alt = page.name || 'Icono';
-                img.onerror = () => { img.style.display = 'none'; };
-                
-                if (page['img-size']) aplicarTamañoImagen(img, page['img-size']);
-
-                const span = document.createElement('span');
-                let rawName = page.name || 'Sin Nombre';
-                
-                span.innerHTML = rawName.replace(/\^/g, '&nbsp;').replace(/¬/g, '<br>');
-
-                if (page['text-outline']) aplicarTextOutline(span, page['text-outline']);
-                if (page['text-color']) aplicarTextColor(span, page['text-color']);
-                if (page['text-place']) aplicarTextPlace(span, page['text-place']);
-                if (page['font']) aplicarFuenteCustom(span, page['font'], index);
-                
-                // Aplicar la nueva propiedad text-size
-                if (page['text-size']) aplicarTextSize(span, page['text-size']);
-
-                if (page['text-place']) {
-                    img.style.margin = '0';
-                }
-
-                a.appendChild(img);
-                a.appendChild(span);
-                hub.appendChild(a);
-            });
         }
     </script>
 </body>
